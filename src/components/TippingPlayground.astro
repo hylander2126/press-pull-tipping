@@ -1,0 +1,324 @@
+---
+// Interactive press-and-pull demo. It is a simplified planar model rather than a physics
+// simulation: the pivot stays fixed, the pull is quasistatic, and the press acts through the
+// pivot edge. The torque fit is the one in wrench_estimator.estimate_press_pull. With the
+// planar CoM offset x_c known, tau(theta) = m g (x_c cos theta - z_c sin theta) is linear in
+// (m g x_c, m g z_c), so ordinary least squares recovers (m, z_c) exactly without noise.
+import results from "../data/results.json";
+
+// Presets use each object's measured ground truth. x_c follows from the true tipping angle.
+const THETA_STAR_GT: Record<string, number> = { box: 18.435, heart: 24.608, flashlight: 16.621, monitor: 14.5 };
+const presets = Object.entries(results).map(([key, r]) => ({
+  key,
+  label: r.label,
+  m: r.gt.m,
+  zc: r.gt.zc * 100,
+  xc: r.gt.zc * Math.tan((THETA_STAR_GT[key] * Math.PI) / 180) * 100,
+  mu: r.gt.mu,
+}));
+
+const sliders = [
+  { id: "m", label: "Mass", unit: "kg", min: 0.1, max: 6, step: 0.01, value: 0.68, group: "object" },
+  { id: "xc", label: "CoM offset from pivot edge, x<sub>c</sub>", unit: "cm", min: 1, max: 15, step: 0.1, value: 5, group: "object" },
+  { id: "zc", label: "CoM height, z<sub>c</sub>", unit: "cm", min: 2, max: 30, step: 0.1, value: 15, group: "object" },
+  { id: "mu", label: "Table friction, μ<sub>t</sub>", unit: "", min: 0.05, max: 0.8, step: 0.01, value: 0.16, group: "object" },
+  { id: "h", label: "Fingertip contact height", unit: "cm", min: 3, max: 55, step: 0.5, value: 30, group: "action" },
+  { id: "press", label: "Press force", unit: "N", min: 0, max: 30, step: 0.5, value: 5, group: "action" },
+  { id: "noise", label: "Sensor noise", unit: "×", min: 0, max: 5, step: 0.1, value: 1, group: "action" },
+];
+const groups = [
+  { id: "object", title: "Object (true values)" },
+  { id: "action", title: "Interaction" },
+];
+---
+
+<div class="viz-root not-prose my-8 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700" data-playground>
+  <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+    <p class="m-0 text-base font-semibold">Interactive model</p>
+    <p class="m-0 text-xs text-zinc-500 dark:text-zinc-400">Simplified planar model, not the MuJoCo simulation</p>
+  </div>
+
+  <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Load an object's true parameters">
+    <span class="text-xs text-zinc-500 dark:text-zinc-400">Load an object:</span>
+    {
+      presets.map((p) => (
+        <button
+          type="button"
+          data-preset={JSON.stringify(p)}
+          class="rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
+        >
+          {p.label}
+        </button>
+      ))
+    }
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-[18rem_1fr]">
+    <div class="flex flex-col gap-4">
+      {
+        groups.map((g) => (
+          <fieldset class="m-0 border-0 p-0">
+            <legend class="mb-2 p-0 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{g.title}</legend>
+            <div class="flex flex-col gap-3">
+              {sliders
+                .filter((s) => s.group === g.id)
+                .map((s) => (
+                  <label class="block text-sm">
+                    <span class="flex justify-between gap-2">
+                      <span set:html={s.label} />
+                      <output data-out={s.id} class="font-mono text-xs tabular-nums text-zinc-600 dark:text-zinc-300" />
+                    </span>
+                    <input type="range" class="w-full accent-zinc-700 dark:accent-zinc-300" data-in={s.id} data-unit={s.unit} min={s.min} max={s.max} step={s.step} value={s.value} />
+                  </label>
+                ))}
+            </div>
+          </fieldset>
+        ))
+      }
+      <button type="button" data-resample class="self-start rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800">
+        New noise sample
+      </button>
+    </div>
+
+    <div class="flex min-w-0 flex-col gap-4">
+      <div data-status class="rounded-lg border-l-4 p-3 text-sm" role="status" aria-live="polite"></div>
+      <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
+        <div class="px-2 pt-1 text-sm font-semibold">Tipping torque about the pivot during the pull</div>
+        <div data-chart class="h-[320px] w-full" role="img" aria-label="Simulated torque versus tilt samples with the true model curve and the least-squares fit"></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-zinc-200 dark:border-zinc-700">
+              <th class="py-2 pr-3 font-semibold">Parameter</th>
+              <th class="py-2 pr-3 text-right font-semibold">True</th>
+              <th class="py-2 pr-3 text-right font-semibold">Estimated</th>
+              <th class="py-2 text-right font-semibold">Error</th>
+            </tr>
+          </thead>
+          <tbody data-table class="font-mono tabular-nums"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <details class="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+    <summary class="cursor-pointer">What this model includes</summary>
+    <p class="mt-2">
+      Pulling horizontally at the contact height <i>h</i> tips the object once the pull reaches
+      <i>m g x<sub>c</sub></i> / <i>h</i>. The table resists sliding up to <i>μ<sub>t</sub></i>(<i>m g</i> + <i>F</i><sub>press</sub>),
+      and the press passes through the pivot edge, so it raises that limit without resisting the tip. Tilt samples run from 1° to 80% of the
+      tipping angle θ*, roughly the range of the real trials, and the fit extrapolates the zero crossing. The sliding push measures
+      <i>μ<sub>t</sub> m g</i> with force noise, and friction is recovered by dividing by the estimated mass. Fingertip slip, pivot motion,
+      and sensor bias are not modeled.
+    </p>
+  </details>
+</div>
+
+<style>
+  .viz-root {
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --grid: #e4e3df;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --good: #0f7a4f;
+    --good-bg: #ecfdf5;
+    --bad: #b42318;
+    --bad-bg: #fef3f2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      --surface-1: #18181b;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --grid: #3f3f46;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --good: #34d399;
+      --good-bg: rgba(6, 78, 59, 0.3);
+      --bad: #f97066;
+      --bad-bg: rgba(122, 39, 26, 0.3);
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    --surface-1: #18181b;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --grid: #3f3f46;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --good: #34d399;
+    --good-bg: rgba(6, 78, 59, 0.3);
+    --bad: #f97066;
+    --bad-bg: rgba(122, 39, 26, 0.3);
+  }
+  [data-status][data-ok="true"] {
+    border-color: var(--good);
+    background: var(--good-bg);
+  }
+  [data-status][data-ok="false"] {
+    border-color: var(--bad);
+    background: var(--bad-bg);
+  }
+</style>
+
+<script>
+  const G = 9.81;
+  const N_SAMPLES = 60;
+  // Noise at the "1×" setting, chosen to be in the range of the binned real-robot signals.
+  const SIGMA_TAU = 0.004; // N·m
+  const SIGMA_F = 0.03; // N
+
+  // Seeded standard normals, so moving a slider rescales the same noise instead of redrawing it.
+  function normals(seed: number, n: number): number[] {
+    let s = seed >>> 0;
+    const u = () => ((s = (s * 1664525 + 1013904223) >>> 0) + 0.5) / 4294967296;
+    return Array.from({ length: n }, () => Math.sqrt(-2 * Math.log(u())) * Math.cos(2 * Math.PI * u()));
+  }
+
+  const deg = (r: number) => (r * 180) / Math.PI;
+  const rad = (d: number) => (d * Math.PI) / 180;
+
+  function init(root: HTMLElement) {
+    const inputs = Object.fromEntries(
+      Array.from(root.querySelectorAll<HTMLInputElement>("input[data-in]")).map((el) => [el.dataset.in!, el]),
+    );
+    const outputs = Object.fromEntries(
+      Array.from(root.querySelectorAll<HTMLOutputElement>("output[data-out]")).map((el) => [el.dataset.out!, el]),
+    );
+    const status = root.querySelector<HTMLElement>("[data-status]")!;
+    const table = root.querySelector<HTMLElement>("[data-table]")!;
+    const chart = root.querySelector<HTMLElement>("[data-chart]")!;
+    let seed = 7;
+    let Plotly: any = null;
+
+    const val = (id: string) => Number(inputs[id].value);
+    const css = (name: string) => getComputedStyle(root).getPropertyValue(name).trim();
+
+    function update() {
+      for (const [id, el] of Object.entries(inputs)) {
+        const digits = Number(el.step) < 0.1 ? 2 : 1;
+        outputs[id].textContent = `${Number(el.value).toFixed(digits)}${el.dataset.unit ? " " + el.dataset.unit : ""}`;
+      }
+
+      const m = val("m"), xc = val("xc") / 100, zc = val("zc") / 100, mu = val("mu");
+      const h = val("h") / 100, press = val("press"), noise = val("noise");
+      const thetaStar = Math.atan2(xc, zc);
+
+      // Which happens first as the pull ramps up: tipping or sliding?
+      const fTip = (m * G * xc) / h;
+      const fSlide = mu * (m * G + press);
+      const fSlideNoPress = mu * m * G;
+      const tips = fTip < fSlide;
+      status.dataset.ok = String(tips);
+      status.innerHTML = tips
+        ? `<strong>✓ Tips before sliding.</strong> Tipping needs a ${fTip.toFixed(2)} N pull; the base holds until ${fSlide.toFixed(2)} N` +
+          (fTip >= fSlideNoPress ? ` (only ${fSlideNoPress.toFixed(2)} N without the press, so the press is what makes this work).` : ".")
+        : `<strong>✗ Slides before tipping.</strong> Tipping needs a ${fTip.toFixed(2)} N pull, but the base starts sliding at ${fSlide.toFixed(2)} N. ` +
+          `Increase the press force or the contact height. The samples below assume the pivot held anyway.`;
+
+      // Press-and-pull samples: tau = m g (x_c cos θ − z_c sin θ) + noise.
+      const z = normals(seed, N_SAMPLES + 1);
+      const theta0 = rad(1), theta1 = Math.max(0.8 * thetaStar, rad(2));
+      const th: number[] = [], tau: number[] = [];
+      for (let i = 0; i < N_SAMPLES; i++) {
+        const t = theta0 + ((theta1 - theta0) * i) / (N_SAMPLES - 1);
+        th.push(t);
+        tau.push(m * G * (xc * Math.cos(t) - zc * Math.sin(t)) + noise * SIGMA_TAU * z[i]);
+      }
+
+      // Least squares on tau = a cos θ − b sin θ, with a = m g x_c and b = m g z_c.
+      let scc = 0, sss = 0, scs = 0, stc = 0, sts = 0;
+      th.forEach((t, i) => {
+        const c = Math.cos(t), s = -Math.sin(t);
+        scc += c * c; sss += s * s; scs += c * s; stc += tau[i] * c; sts += tau[i] * s;
+      });
+      const det = scc * sss - scs * scs;
+      const a = (stc * sss - sts * scs) / det;
+      const b = (sts * scc - stc * scs) / det;
+      const mHat = a / (G * xc);
+      const zcHat = b / (mHat * G);
+
+      // Sliding push measures μ m g; friction follows from the estimated mass.
+      const fMeas = mu * m * G + noise * SIGMA_F * z[N_SAMPLES];
+      const muHat = fMeas / (mHat * G);
+
+      const valid = mHat > 0 && zcHat > 0;
+      const err = (est: number, truth: number) => (valid ? `${((100 * Math.abs(est - truth)) / truth).toFixed(1)}%` : "—");
+      const cell = (x: number, digits: number) => (valid ? x.toFixed(digits) : "fit failed");
+      const rows: [string, string, string, string][] = [
+        ["Mass (kg)", m.toFixed(3), cell(mHat, 3), err(mHat, m)],
+        ["CoM height (cm)", (zc * 100).toFixed(2), cell(zcHat * 100, 2), err(zcHat, zc)],
+        ["Friction μ<sub>t</sub>", mu.toFixed(3), cell(muHat, 3), err(muHat, mu)],
+      ];
+      table.innerHTML = rows
+        .map(([p, t, e, r]) => `<tr class="border-b border-zinc-100 dark:border-zinc-800"><td class="py-1.5 pr-3 font-sans">${p}</td><td class="py-1.5 pr-3 text-right">${t}</td><td class="py-1.5 pr-3 text-right">${e}</td><td class="py-1.5 text-right">${r}</td></tr>`)
+        .join("");
+
+      draw(th, tau, thetaStar, valid ? { a, b, thetaHat: Math.atan2(a, b) } : null, m, xc, zc);
+    }
+
+    function draw(th: number[], tau: number[], thetaStar: number, fit: { a: number; b: number; thetaHat: number } | null, m: number, xc: number, zc: number) {
+      if (!Plotly) return;
+      const ink = css("--text-secondary"), primary = css("--text-primary"), grid = css("--grid");
+      const c1 = css("--series-1"), c2 = css("--series-2");
+      const axis = { gridcolor: grid, zerolinecolor: ink, linecolor: grid, tickfont: { color: ink, size: 11 }, title: { font: { color: ink, size: 12 } } };
+
+      const xMax = deg(thetaStar) * 1.15;
+      const curveX = Array.from({ length: 80 }, (_, i) => (xMax * i) / 79);
+      const trueY = curveX.map((d) => m * G * (xc * Math.cos(rad(d)) - zc * Math.sin(rad(d))));
+      const traces: any[] = [
+        { x: th.map(deg), y: tau, name: "measured (pull)", type: "scatter", mode: "markers", marker: { color: c1, size: 8, line: { color: css("--surface-1"), width: 2 } }, hovertemplate: "θ %{x:.1f}°<br>τ %{y:.3f} N·m<extra>measured</extra>" },
+        { x: curveX, y: trueY, name: "true model", type: "scatter", mode: "lines", line: { color: ink, width: 2, dash: "dot" }, hoverinfo: "skip" },
+      ];
+      const shapes: any[] = [{ type: "line", x0: deg(thetaStar), x1: deg(thetaStar), yref: "paper", y0: 0, y1: 1, line: { color: ink, width: 1.5, dash: "dot" } }];
+      const annotations: any[] = [{ x: deg(thetaStar), y: 1, yref: "paper", yanchor: "bottom", xanchor: "left", text: ` true θ* ${deg(thetaStar).toFixed(1)}°`, showarrow: false, font: { size: 11, color: ink } }];
+      if (fit) {
+        traces.push({ x: curveX, y: curveX.map((d) => fit.a * Math.cos(rad(d)) - fit.b * Math.sin(rad(d))), name: "least-squares fit", type: "scatter", mode: "lines", line: { color: c2, width: 2 }, hoverinfo: "skip" });
+        shapes.push({ type: "line", x0: deg(fit.thetaHat), x1: deg(fit.thetaHat), yref: "paper", y0: 0, y1: 1, line: { color: c2, width: 1.5 } });
+        annotations.push({ x: deg(fit.thetaHat), y: 0.9, yref: "paper", yanchor: "bottom", xanchor: "right", text: `fit θ* ${deg(fit.thetaHat).toFixed(1)}° `, showarrow: false, font: { size: 11, color: primary } });
+      }
+
+      Plotly.react(chart, traces, {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { family: "inherit", color: primary },
+        margin: { l: 56, r: 12, t: 24, b: 48 },
+        hovermode: "closest",
+        legend: { orientation: "h", y: -0.2, x: 0, font: { size: 11, color: ink } },
+        hoverlabel: { bgcolor: css("--surface-1"), bordercolor: grid, font: { color: primary } },
+        xaxis: { ...axis, range: [0, xMax], title: { ...axis.title, text: "object tilt θ (deg)" } },
+        yaxis: { ...axis, title: { ...axis.title, text: "torque (N·m)" } },
+        shapes,
+        annotations,
+      }, { displayModeBar: false, responsive: true });
+    }
+
+    Object.values(inputs).forEach((el) => el.addEventListener("input", update));
+    root.querySelector("[data-resample]")!.addEventListener("click", () => {
+      seed = (seed * 2654435761 + 1) >>> 0;
+      update();
+    });
+    root.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const p = JSON.parse(btn.dataset.preset!);
+        for (const id of ["m", "xc", "zc", "mu"]) inputs[id].value = String(p[id]);
+        update();
+      }),
+    );
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
+    update();
+
+    // Plotly (~1 MB) is shared with the wrench plots and fetched only when this scrolls near view.
+    new IntersectionObserver(async (entries, obs) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      obs.disconnect();
+      Plotly = (await import("plotly.js-basic-dist-min")).default;
+      update();
+    }, { rootMargin: "400px" }).observe(root);
+  }
+
+  document.querySelectorAll<HTMLElement>("[data-playground]").forEach(init);
+</script>

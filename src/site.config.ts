@@ -1,7 +1,7 @@
 // Links and citation data for the project page, all in one place.
-// TODO(before publishing): confirm the repo URL. Add arXiv when available.
+// TODO: add arXiv when available.
 
-export const REPO_URL = "https://github.com/hylander2126/ISRR2026"; // TODO: confirm the repo name
+export const REPO_URL = "https://github.com/hylander2126/press-pull-tipping";
 export const PAPER_URL = "https://stevenmhyland.com/assets/pdfs/ISRR_2026.pdf";
 export const ARXIV_URL = "#"; // TODO: e.g. https://arxiv.org/abs/XXXX.XXXXX
 

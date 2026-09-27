@@ -17,6 +17,7 @@ import OverviewVideo from "./components/OverviewVideo.astro";
 import PipelineDiagram from "./components/PipelineDiagram.astro";
 import ObjectExplorer from "./components/ObjectExplorer.astro";
 import WrenchPlot from "./components/WrenchPlot.astro";
+import TippingPlayground from "./components/TippingPlayground.astro";
 import BibTeX from "./components/BibTeX.astro";
 import { PAPER_URL, ARXIV_URL, CODE_URL, PACKAGE_URL, SANDBOX_URL, ESTIMATOR_URL } from "./site.config";
 import fig1 from "./assets/fig1_press_pull.png";
@@ -24,7 +25,7 @@ import fig5 from "./assets/fig5_finger_objects.jpg";
 
 <Header
   shortTitle="Press-and-Pull Tipping"
-  subtitle="Estimate mass, center-of-mass height, and surface friction—without grasping."
+  subtitle="Estimating mass, center-of-mass height, and surface friction without grasping"
   title="Multi-Modal Non-Prehensile Estimation of Physical Parameters via Press-and-Pull Tipping"
   conference="ISRR 2026 · Worcester Polytechnic Institute"
   authors={[
@@ -36,7 +37,7 @@ import fig5 from "./assets/fig5_finger_objects.jpg";
     { name: "Paper", url: PAPER_URL, icon: "ri:file-pdf-2-line" },
     { name: "arXiv", url: ARXIV_URL, icon: "academicons:arxiv" },
     { name: "Code & data", url: CODE_URL, icon: "ri:github-line" },
-    { name: "Watch overview", url: "#overview", icon: "ri:play-circle-line" },
+    { name: "Video", url: "#overview", icon: "ri:play-circle-line" },
     { name: "BibTeX", url: "#citation", icon: "ri:double-quotes-l" },
   ]}
 />
@@ -47,15 +48,16 @@ import fig5 from "./assets/fig5_finger_objects.jpg";
 
 <nav aria-label="Page sections" class="not-prose mb-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm">
   <a href="#results">Results</a>
-  <a href="#method">How it works</a>
-  <a href="#overview">Video overview</a>
+  <a href="#method">Method</a>
+  <a href="#overview">Video</a>
   <a href="#signals">Signals & fits</a>
-  <a href="#simulation">Try the simulator</a>
+  <a href="#simulation">Simulation</a>
+  <a href="#code">Code</a>
 </nav>
 
-<h2 id="results">Four objects. One estimation procedure.</h2>
+<h2 id="results">Results</h2>
 
-Explore a representative trial and the estimates over 10 trials per object. The heart is the hardest case: its low mass and high press-to-pull ratio leave a systematic offset in CoM height. The small trial spread does not eliminate that bias.
+Select an object to see a representative trial and the estimates over 10 trials. The heart was the hardest case. Its low mass and high press-to-pull ratio leave a consistent offset in the CoM height estimate, even though the spread across trials is small.
 
 <Wide><ObjectExplorer /></Wide>
 
@@ -68,9 +70,9 @@ Explore a representative trial and the estimates over 10 trials per object. The 
   </Figure>
 </details>
 
-<h2 id="method">Push to slide. Press to tip. Combine the evidence.</h2>
+<h2 id="method">Method</h2>
 
-A low push measures mass and friction together. Tipping reveals mass and CoM height. Combining the two separates all three parameters. Pressing down first helps keep the pivot in place when a conventional forward push makes an object slide or swirl.
+A low sliding push measures the product of mass and friction, and tipping the object measures mass and CoM height. Together they give all three parameters. Pressing down before pulling keeps the pivot in place on objects that would slide or spin under a conventional forward push.
 
 <PipelineDiagram />
 
@@ -85,12 +87,16 @@ A low push measures mass and friction together. Tipping reveals mass and CoM hei
 </div>
 </Wide>
 
+The model below lets you try this yourself. Change the object or the press force to see whether it tips before it slides, and how well a noisy pull recovers the parameters. Loading an object uses its measured values.
+
+<Wide><TippingPlayground /></Wide>
+
 <aside class="my-6 rounded-xl border-l-4 border-emerald-600 bg-emerald-50 p-5 text-base dark:bg-emerald-950/30">
-  <strong>What the method needs.</strong> Planar CoM coordinates are supplied by prior pushing-based estimation; this stage recovers mass, CoM height, and table friction. The top contact and pivot must be visible and reachable, the fingertip must hold without slipping, and the pivot-to-CoM geometry must stay approximately rigid. Friction recovery additionally requires a low push that slides before tipping. Four objects establish feasibility; the boundary for base roundness and compliance is not yet characterized.
+  <strong>Assumptions and limitations.</strong> Planar CoM coordinates are supplied by prior pushing-based estimation; this stage recovers mass, CoM height, and table friction. The top contact and pivot must be visible and reachable, the fingertip must hold without slipping, and the pivot-to-CoM geometry must stay approximately rigid. Friction recovery additionally requires a low push that slides before tipping. Four objects establish feasibility; the boundary for base roundness and compliance is not yet characterized.
 </aside>
 
 <details class="my-6 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-  <summary class="cursor-pointer text-base font-semibold">Technical explanation: why the press helps and how the fit works</summary>
+  <summary class="cursor-pointer text-base font-semibold">Why pressing helps, and how the fit works</summary>
 
 An object tips before it slides when $F_\text{tip} < F_\text{slide} = \mu_t N$. A downward press increases the normal force to $N = mg + F_\text{press}$, raising the sliding threshold while a pull along an arc tips the object about its near edge.
 
@@ -111,28 +117,28 @@ The ground reaction acts through the pivot, so its moment about the pivot edge v
 
 </details>
 
-<h2 id="overview">Watch the research overview</h2>
+<h2 id="overview">Video</h2>
 
-The overview connects the shove-to-region application to sliding, press-and-pull estimation, and adaptive press selection. The shove task is simulated; the four-object estimation experiments use the physical robot.
+The video walks through the shove task, the sliding push, press-and-pull estimation, and adaptive press selection. The shove task is simulated; the four-object estimation experiments use the physical robot.
 
 <OverviewVideo />
 
 <details class="my-6 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-  <summary class="cursor-pointer text-base font-semibold">Read the paper abstract</summary>
+  <summary class="cursor-pointer text-base font-semibold">Abstract</summary>
 
 Recovering physical properties of unknown objects through non-prehensile interaction is challenging because no single manipulation primitive reveals all relevant parameters. Planar pushing couples mass and friction, while conventional tipping cannot recover friction and may fail entirely when low-friction or curved-base objects slide or rotate instead of tipping. We introduce a multi-modal estimation framework that combines a sliding interaction with a press-and-pull tipping primitive to recover object mass, center-of-mass height, and surface friction. The press-and-pull interaction increases the object–table sliding threshold and stabilizes the pivot, enabling controlled tipping without any prior geometric object model. Wrist force/torque sensing, RGB-D perception, and robot proprioception are fused to estimate the physical parameters from the two complementary interaction modes. Experiments on an ABB IRB120 across four objects with varied geometry, mass, center of mass, and friction achieve low relative error, while successfully operating on curved-base objects that fail under conventional forward tipping. The results demonstrate that complementary non-prehensile interactions can recover a compact set of physical parameters without grasping, a prior object model, or learned interaction dynamics.
 
 </details>
 
-<h2 id="signals">Wrench signals and model fits</h2>
+<h2 id="signals">Force/torque signals and model fits</h2>
 
-These plots show processed measurements from trial 2 for each object. Wrenches are transformed into the pivot frame and averaged into approximately 25 Hz bins; torque-versus-tilt samples are binned separately. The curves are model fits, not additional measurements. The estimated zero crossing constrains CoM height given the planar CoM input. Select an object or hover for values.
+These plots show processed measurements from trial 2 for each object. Wrenches are transformed into the pivot frame and averaged into approximately 25 Hz bins; torque-versus-tilt samples are binned separately. The curves are model fits. Given the planar CoM, the zero crossing of the torque curve determines the CoM height. Select an object, or hover over a plot for values.
 
 <Wide><WrenchPlot /></Wide>
 
-<h2 id="simulation">Try the estimation in MuJoCo</h2>
+<h2 id="simulation">Simulation</h2>
 
-A floating fingertip performs a low sliding push, then presses, pulls, and returns the object. A virtual wrist F/T sensor supplies measurements to the same estimator used for the real-robot data. Mass and CoM height are withheld from the estimator; planar CoM is supplied.
+In MuJoCo, a floating fingertip performs a low sliding push, then presses, pulls, and returns the object. A virtual wrist F/T sensor supplies measurements to the same estimator used for the real-robot data. Mass and CoM height are withheld from the estimator; planar CoM is supplied.
 
 <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
   <VideoCard src="videos/sim_press_pull.mp4" poster="posters/sim_press_pull.jpg" title="Push → press → pull → return" speed="×5" aspect="16/9">
@@ -154,19 +160,19 @@ A floating fingertip performs a low sliding push, then presses, pulls, and retur
   </div>
 </div>
 
-<h2 id="code">Reproduce it: code, data, and website in one repo</h2>
+<h2 id="code">Code and data</h2>
 
-The <a href={CODE_URL}>project repository</a> contains this website and the <a href={PACKAGE_URL}>Python package</a>: the <a href={ESTIMATOR_URL}>estimator</a>, <a href={SANDBOX_URL}>MuJoCo sandbox</a>, all 40 press-and-pull trials, and four sliding pushes. No robot or ROS installation is needed for offline evaluation.
+The <a href={CODE_URL}>project repository</a> contains this website and a <a href={PACKAGE_URL}>Python package</a>: the <a href={ESTIMATOR_URL}>estimator</a>, <a href={SANDBOX_URL}>MuJoCo sandbox</a>, all 40 press-and-pull trials, and four sliding pushes. No robot or ROS installation is needed for offline evaluation.
 
 ```bash
-git clone https://github.com/hylander2126/ISRR2026.git
-cd ISRR2026
+git clone https://github.com/hylander2126/press-pull-tipping.git
+cd press-pull-tipping
 pip install -e ./code
 python code/run_offline_eval.py --object all -q
 python -m press_pull_estimator.sim.press_pull_sandbox
 ```
 
-The offline evaluation reproduces the rounded values in Table 2. Try `--mass 1.1 --com-z 0.11`, `--object slab`, or `--viewer` with the simulator to explore other settings.
+The offline evaluation reproduces the rounded values in Table 2. The simulator accepts options such as `--mass 1.1 --com-z 0.11`, `--object slab`, and `--viewer`.
 
 <h2 id="citation">Citation</h2>
 
