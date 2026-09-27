@@ -1,0 +1,29 @@
+---
+import VideoCard from "./VideoCard.astro";
+const chapters = [
+  { time: 8, label: "0:08 · Shove failures" },
+  { time: 20, label: "0:20 · Sliding" },
+  { time: 52, label: "0:52 · Object demos" },
+  { time: 98, label: "1:38 · Shove result" },
+];
+---
+<div data-overview>
+  <VideoCard src="videos/research_overview.mp4" poster="posters/research_overview.jpg" title="Research overview · 1 min 50 s" aspect="16/9" autoplay={false}>
+    Includes embedded phase labels and playback-speed annotations. Use the player controls for sound, scrubbing, and fullscreen.
+  </VideoCard>
+  <div class="not-prose mt-3 flex flex-wrap gap-2" role="group" aria-label="Video chapters">
+    {chapters.map(({ time, label }) => <button type="button" data-seek={time} class="rounded-full border border-zinc-300 px-3 py-2 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800">{label}</button>)}
+  </div>
+</div>
+<script>
+  document.querySelectorAll<HTMLElement>("[data-overview]").forEach((root) => {
+    const video = root.querySelector("video")!;
+    root.querySelectorAll<HTMLButtonElement>("[data-seek]").forEach((button) => {
+      button.addEventListener("click", () => {
+        video.currentTime = Number(button.dataset.seek);
+        video.scrollIntoView({ block: "center" });
+        void video.play().catch(() => {});
+      });
+    });
+  });
+</script>

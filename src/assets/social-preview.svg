@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#101c1b"/>
+  <rect x="56" y="56" width="8" height="518" rx="4" fill="#6ee7b7"/>
+  <g font-family="DejaVu Sans, sans-serif">
+    <text x="96" y="98" fill="#6ee7b7" font-size="24" letter-spacing="3">ISRR 2026 · WORCESTER POLYTECHNIC INSTITUTE</text>
+    <text x="92" y="205" fill="#ffffff" font-size="76" font-weight="bold">Press-and-Pull</text>
+    <text x="92" y="290" fill="#ffffff" font-size="76" font-weight="bold">Tipping</text>
+    <text x="96" y="362" fill="#d4e4df" font-size="32">Mass, CoM height, and friction.</text>
+    <text x="96" y="410" fill="#d4e4df" font-size="32">Without grasping.</text>
+    <rect x="96" y="458" width="288" height="60" rx="15" fill="#1e3933"/>
+    <text x="120" y="498" fill="#b7f7d7" font-size="26">4 physical objects</text>
+    <rect x="402" y="458" width="308" height="60" rx="15" fill="#1e3933"/>
+    <text x="426" y="498" fill="#b7f7d7" font-size="26">40 recorded trials</text>
+    <text x="96" y="569" fill="#adc4bc" font-size="23">Steven M. Hyland · Jing Xiao · Cagdas D. Onal</text>
+  </g>
+  <g transform="translate(885 223)">
+    <path d="M-45 255H235" stroke="#637d74" stroke-width="6"/>
+    <path d="M0 250L-42 33L65 12L107 229Z" fill="#8cd9c2" stroke="#d5fff0" stroke-width="4"/>
+    <circle cx="0" cy="250" r="10" fill="#ffffff"/>
+    <path d="M-17 -42V9M-30 -4L-17 9L-4 -4" fill="none" stroke="#fbbf24" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M194 146Q194 32 108 -15M112 5L108 -15L129 -13" fill="none" stroke="#6ee7b7" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="33" cy="131" r="9" fill="#101c1b"/>
+  </g>
+</svg>

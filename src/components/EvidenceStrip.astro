@@ -1,0 +1,19 @@
+---
+import results from "../data/results.json";
+const objects = Object.values(results);
+const trials = objects.reduce((sum, object) => sum + object.n_trials, 0);
+const belowSix = objects.filter((object) => Object.values(object.est).every((stat) => stat.err_pct < 6)).length;
+const masses = objects.map((object) => object.gt.m);
+const worstError = results.heart.est.zc.err_pct.toFixed(1);
+---
+<aside class="not-prose my-6 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50" aria-label="Experimental results at a glance">
+  <div class="grid grid-cols-3 gap-2 divide-x divide-zinc-200 text-center dark:divide-zinc-700">
+    <div><div class="text-lg font-semibold sm:text-2xl">{trials}/{trials}</div><div class="text-xs text-zinc-600 sm:text-sm dark:text-zinc-400">recorded tipping trials completed</div></div>
+    <div><div class="text-lg font-semibold sm:text-2xl">{Math.min(...masses).toFixed(3)}–{Math.max(...masses).toFixed(2)} kg</div><div class="text-xs text-zinc-600 sm:text-sm dark:text-zinc-400">across {objects.length} physical objects</div></div>
+    <div><div class="text-lg font-semibold sm:text-2xl">&lt;6% error</div><div class="text-xs text-zinc-600 sm:text-sm dark:text-zinc-400">all three parameters, {belowSix} of {objects.length} objects</div></div>
+  </div>
+  <p class="mb-0 mt-4 border-t border-zinc-200 pt-3 text-center text-xs leading-relaxed text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+    Observed results in this study, 10 trials per object. Largest error: <strong class="text-zinc-900 dark:text-zinc-100">{worstError}% in the heart's CoM height</strong>.
+    Errors compare trial means with ground truth.
+  </p>
+</aside>

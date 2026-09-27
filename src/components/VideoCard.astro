@@ -1,0 +1,103 @@
+---
+import { withBase } from "../site.config";
+
+interface Props {
+  src?: string;
+  title: string;
+  tone?: "neutral" | "fail" | "success";
+  speed?: string;
+  aspect?: "4/3" | "16/9";
+  poster?: string;
+  autoplay?: boolean;
+}
+
+const { src, title, tone = "neutral", speed, aspect = "4/3", poster, autoplay = true } = Astro.props;
+const multiplier = Number(speed?.replace("×", "")) || 1;
+const aspectClass = aspect === "16/9" ? "aspect-video" : "aspect-[4/3]";
+const chip = {
+  neutral: "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900",
+  fail: "bg-red-700 text-white",
+  success: "bg-emerald-700 text-white",
+}[tone];
+---
+
+<figure class="not-prose m-0 flex min-w-0 flex-col gap-2" data-video-card>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <span class:list={["rounded-full px-3 py-1 text-xs font-semibold", chip]}>{title}</span>
+    {speed && <span class="text-xs text-zinc-500 dark:text-zinc-400">Edited clip · {speed} speed</span>}
+  </div>
+  <div class="overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-800">
+    {src ? (
+      <video
+        class:list={["block w-full object-contain", aspectClass]}
+        src={withBase(src)}
+        poster={poster ? withBase(poster) : undefined}
+        data-autoplay={autoplay ? "true" : undefined}
+        loop={autoplay}
+        muted={autoplay}
+        controls
+        playsinline
+        preload="metadata"
+        aria-label={title}
+      />
+    ) : (
+      <div class:list={["flex items-center justify-center border-2 border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-600", aspectClass]}>
+        Comparison footage coming soon
+      </div>
+    )}
+  </div>
+  {src && (
+    <div class="flex flex-wrap items-center gap-3 text-xs">
+      <button type="button" data-replay class="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800" aria-label={`Replay ${title}`}>↻ Replay</button>
+      {multiplier > 1 && (
+        <label class="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+          Playback
+          <select data-playback class="rounded-md border border-zinc-300 bg-white py-1 pr-7 pl-2 text-xs dark:border-zinc-600 dark:bg-zinc-900" aria-label={`Playback speed for ${title}`}>
+            <option value="1">{speed} · edited</option>
+            <option value={1 / multiplier}>≈1× · real time</option>
+          </select>
+        </label>
+      )}
+    </div>
+  )}
+  <figcaption class="text-sm leading-snug text-zinc-600 dark:text-zinc-400"><slot /></figcaption>
+</figure>
+
+<script>
+  document.querySelectorAll<HTMLElement>("[data-video-card]").forEach((card) => {
+    const video = card.querySelector("video");
+    if (!video) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let userPaused = false;
+    let automaticPause = false;
+    let visible = false;
+    const pause = () => {
+      if (video.paused) return;
+      automaticPause = true;
+      video.pause();
+    };
+    const update = () => {
+      if (!visible || motion.matches || document.hidden) pause();
+      else if (video.dataset.autoplay && !userPaused) void video.play().catch(() => {});
+    };
+    video.addEventListener("pause", () => {
+      if (!automaticPause) userPaused = true;
+      automaticPause = false;
+    });
+    video.addEventListener("play", () => { userPaused = false; });
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      update();
+    }, { threshold: 0.25 });
+    observer.observe(video);
+    motion.addEventListener("change", update);
+    document.addEventListener("visibilitychange", update);
+    card.querySelector("[data-replay]")?.addEventListener("click", () => {
+      video.currentTime = 0;
+      void video.play().catch(() => {});
+    });
+    card.querySelector<HTMLSelectElement>("[data-playback]")?.addEventListener("change", (event) => {
+      video.playbackRate = Number((event.currentTarget as HTMLSelectElement).value);
+    });
+  });
+</script>
