@@ -1,7 +1,7 @@
 ---
 // Interactive press-and-pull demo. It is a simplified planar model rather than a physics
-// simulation: the pivot stays fixed, the pull is quasistatic, and the press acts through the
-// pivot edge. The torque fit is the one in wrench_estimator.estimate_press_pull. With the
+// simulation: the pivot stays fixed, the pull is quasistatic, and the fingertip presses on the
+// top face just inboard of the pivot edge, so the press acts through that edge. The torque fit is the one in wrench_estimator.estimate_press_pull. With the
 // planar CoM offset x_c known, tau(theta) = m g (x_c cos theta - z_c sin theta) is linear in
 // (m g x_c, m g z_c), so ordinary least squares recovers (m, z_c) exactly without noise.
 import results from "../data/results.json";
@@ -22,7 +22,7 @@ const sliders = [
   { id: "xc", label: "CoM offset from pivot edge, x<sub>c</sub>", unit: "cm", min: 1, max: 15, step: 0.1, value: 5, group: "object" },
   { id: "zc", label: "CoM height, z<sub>c</sub>", unit: "cm", min: 2, max: 30, step: 0.1, value: 15, group: "object" },
   { id: "mu", label: "Table friction, μ<sub>t</sub>", unit: "", min: 0.05, max: 0.8, step: 0.01, value: 0.16, group: "object" },
-  { id: "h", label: "Fingertip contact height", unit: "cm", min: 3, max: 55, step: 0.5, value: 30, group: "action" },
+  { id: "muf", label: "Fingertip friction, μ<sub>f</sub>", unit: "", min: 0.1, max: 1.5, step: 0.01, value: 0.8, group: "action" },
   { id: "press", label: "Press force", unit: "N", min: 0, max: 30, step: 0.5, value: 5, group: "action" },
   { id: "noise", label: "Sensor noise", unit: "×", min: 0, max: 5, step: 0.1, value: 1, group: "action" },
 ];
@@ -85,10 +85,10 @@ const groups = [
       <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
         <div class="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-1">
           <span class="text-sm font-semibold">Side view during the pull</span>
-          <span class="text-xs text-zinc-500 dark:text-zinc-400">Schematic box, 2x<sub>c</sub> wide</span>
+          <span class="text-xs text-zinc-500 dark:text-zinc-400">Schematic box, 2x<sub>c</sub> wide × 2z<sub>c</sub> tall</span>
         </div>
-        <svg data-scene viewBox="0 0 480 230" class="block h-[230px] w-full" role="img" aria-label="Side view of the object tipping about its near bottom edge, or sliding, as the fingertip pulls">
-          <line data-el="table" x1="0" x2="480" y1="205" y2="205" stroke-width="2" />
+        <svg data-scene viewBox="0 0 480 280" class="block h-[280px] w-full" role="img" aria-label="Side view of the object tipping about its near bottom edge, or sliding, as the fingertip pulls">
+          <line data-el="table" x1="0" x2="480" y1="255" y2="255" stroke-width="2" />
           <line data-el="plumb" stroke-width="1.5" stroke-dasharray="4 4" />
           <polygon data-el="body" stroke-width="2" stroke-linejoin="round" />
           <path data-el="g" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
@@ -100,8 +100,8 @@ const groups = [
           <text data-el="gLabel" font-size="12" />
           <text data-el="pressLabel" font-size="12" text-anchor="end" />
           <text data-el="pullLabel" font-size="12" text-anchor="end" />
-          <text data-el="result" x="12" y="24" font-size="14" font-weight="600" />
-          <text data-el="tilt" x="12" y="42" font-size="12" />
+          <text data-el="result" x="468" y="24" font-size="14" font-weight="600" text-anchor="end" />
+          <text data-el="tilt" x="468" y="42" font-size="12" text-anchor="end" />
         </svg>
       </div>
       <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
@@ -127,12 +127,13 @@ const groups = [
   <details class="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
     <summary class="cursor-pointer">What this model includes</summary>
     <p class="mt-2">
-      Pulling horizontally at the contact height <i>h</i> tips the object once the pull reaches
-      <i>m g x<sub>c</sub></i> / <i>h</i>. The table resists sliding up to <i>μ<sub>t</sub></i>(<i>m g</i> + <i>F</i><sub>press</sub>),
-      and the press passes through the pivot edge, so it raises that limit without resisting the tip. Tilt samples run from 1° to 80% of the
+      The fingertip presses on the top face, just inboard of the pivot edge, and pulls horizontally. The schematic box is
+      <i>H</i> = 2<i>z<sub>c</sub></i> tall, so the object tips once the pull reaches <i>m g x<sub>c</sub></i> / <i>H</i>. The table resists sliding up to <i>μ<sub>t</sub></i>(<i>m g</i> + <i>F</i><sub>press</sub>),
+      and the press passes through the pivot edge, so it raises that limit without resisting the tip. The pull reaches the object only
+      through fingertip friction, so the fingertip slips once the pull exceeds <i>μ<sub>f</sub> F</i><sub>press</sub>. Tilt samples run from 1° to 80% of the
       tipping angle θ*, roughly the range of the real trials, and the fit extrapolates the zero crossing. The sliding push measures
-      <i>μ<sub>t</sub> m g</i> with force noise, and friction is recovered by dividing by the estimated mass. Fingertip slip, pivot motion,
-      and sensor bias are not modeled.
+      <i>μ<sub>t</sub> m g</i> with force noise, and friction is recovered by dividing by the estimated mass. Rolling at the fingertip, pivot motion,
+      the horizontal component of the press at larger tilts, and sensor bias are not modeled.
     </p>
   </details>
 </div>
@@ -226,20 +227,30 @@ const groups = [
       }
 
       const m = val("m"), xc = val("xc") / 100, zc = val("zc") / 100, mu = val("mu");
-      const h = val("h") / 100, press = val("press"), noise = val("noise");
+      const muf = val("muf"), press = val("press"), noise = val("noise");
+      const H = 2 * zc; // the fingertip contact is on the top face
       const thetaStar = Math.atan2(xc, zc);
 
-      // Which happens first as the pull ramps up: tipping or sliding?
-      const fTip = (m * G * xc) / h;
+      // Which happens first as the pull ramps up: tipping, the base sliding, or the fingertip slipping?
+      const fTip = (m * G * xc) / H;
       const fSlide = mu * (m * G + press);
       const fSlideNoPress = mu * m * G;
-      const tips = fTip < fSlide;
-      status.dataset.ok = String(tips);
-      status.innerHTML = tips
-        ? `<strong>✓ Tips before sliding.</strong> Tipping needs a ${fTip.toFixed(2)} N pull; the base holds until ${fSlide.toFixed(2)} N` +
-          (fTip >= fSlideNoPress ? ` (only ${fSlideNoPress.toFixed(2)} N without the press, so the press is what makes this work).` : ".")
-        : `<strong>✗ Slides before tipping.</strong> Tipping needs a ${fTip.toFixed(2)} N pull, but the base starts sliding at ${fSlide.toFixed(2)} N. ` +
-          `Increase the press force or the contact height. The samples below assume the pivot held anyway.`;
+      const fGrip = muf * press;
+      const outcome: Outcome = fTip < Math.min(fSlide, fGrip) ? "tips" : fGrip <= fSlide ? "slips" : "slides";
+      // Both limits grow with the press, so each sets a minimum press force.
+      const pressMin = Math.max(fTip / muf, fTip / mu - m * G, 0);
+      const need = `Tipping needs a ${fTip.toFixed(2)} N pull`;
+      const fix = `Raise the press force above ${pressMin.toFixed(1)} N. The samples below assume the object tipped anyway.`;
+      status.dataset.ok = String(outcome === "tips");
+      status.innerHTML =
+        outcome === "tips"
+          ? `<strong>✓ Tips before sliding or slipping.</strong> ${need}; the fingertip grips up to ${fGrip.toFixed(2)} N and the base holds until ${fSlide.toFixed(2)} N` +
+            (fTip >= fSlideNoPress ? ` (only ${fSlideNoPress.toFixed(2)} N without the press).` : ".") +
+            ` The minimum press here is ${pressMin.toFixed(1)} N.`
+          : outcome === "slips"
+            ? `<strong>✗ Fingertip slips before tipping.</strong> ${need}, but the fingertip grips only up to ${fGrip.toFixed(2)} N` +
+              (press > 0 ? "." : " because nothing presses it on.") + ` ${fix}`
+            : `<strong>✗ Slides before tipping.</strong> ${need}, but the base starts sliding at ${fSlide.toFixed(2)} N. ${fix}`;
 
       // Press-and-pull samples: tau = m g (x_c cos θ − z_c sin θ) + noise.
       const z = normals(seed, N_SAMPLES + 1);
@@ -280,18 +291,20 @@ const groups = [
         .join("");
 
       draw(th, tau, thetaStar, valid ? { a, b, thetaHat: Math.atan2(a, b) } : null, m, xc, zc);
-      scene = { m, xc, zc, h, press, tips, thetaStar, W: 2 * xc, H: Math.max(2 * zc, h + 0.01) };
+      scene = { m, xc, zc, press, outcome, thetaStar, W: 2 * xc, H };
       drawScene();
     }
 
     // Side view. The object tips about its near (left) bottom edge toward the fingertip, or,
-    // when friction can't hold the base, slides left without tilting. One cycle ramps the
+    // when friction can't hold the base, slides left without tilting, or, when the fingertip
+    // can't grip, the fingertip slides off the near edge and the object stays put. One cycle ramps the
     // pull up, holds, and returns, like the arc and unarc.
-    type Scene = { m: number; xc: number; zc: number; h: number; press: number; tips: boolean; thetaStar: number; W: number; H: number };
+    type Outcome = "tips" | "slides" | "slips";
+    type Scene = { m: number; xc: number; zc: number; press: number; outcome: Outcome; thetaStar: number; W: number; H: number };
     let scene: Scene | null = null;
     const svg = root.querySelector<SVGSVGElement>("[data-scene]")!;
     const el = Object.fromEntries(Array.from(svg.querySelectorAll<SVGElement>("[data-el]")).map((e) => [e.dataset.el!, e]));
-    const GROUND = 205, SLIDE = 0.05, CYCLE = 4.5;
+    const GROUND = 255, SLIDE = 0.05, CYCLE = 4.5;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let phase = 0.4; // 0..1 of how far into the pull; the still frame when motion is off
     const t0 = performance.now();
@@ -307,15 +320,18 @@ const groups = [
 
     function drawScene() {
       if (!scene) return;
-      const { m, xc, zc, h, press, tips, thetaStar, W, H } = scene;
+      const { m, xc, zc, press, outcome, thetaStar, W, H } = scene;
+      const tips = outcome === "tips";
       const thetaMax = 0.85 * thetaStar;
       const theta = tips ? thetaMax * phase : 0;
-      const shift = tips ? 0 : SLIDE * phase;
+      const shift = outcome === "slides" ? SLIDE * phase : 0;
 
       // Fit the swept extent into the view: left of the pivot for the tilt or slide, right for the width.
-      const left = Math.max(H * Math.sin(thetaMax), SLIDE) + 0.04;
-      const s = Math.min(165 / (H + 0.02), 440 / (left + W));
-      const px = 20 + left * s + (440 - (left + W) * s) / 2;
+      // Fixed pixel room is kept above the top face for the press arrow and left of it for the pull.
+      const ARROW_ROOM = 90;
+      const left = Math.max(H * Math.sin(thetaMax), SLIDE) + 0.01;
+      const s = Math.min(150 / H, (440 - ARROW_ROOM) / (left + W));
+      const px = 20 + ARROW_ROOM + left * s + (440 - ARROW_ROOM - (left + W) * s) / 2;
       const c = Math.cos(theta), sn = Math.sin(theta);
       // Object frame (x right from the pivot, z up) to screen, tilted toward -x by theta.
       const P = (x: number, z: number): [number, number] => [px + ((x * c - z * sn) - shift) * s, GROUND - (x * sn + z * c) * s];
@@ -351,13 +367,14 @@ const groups = [
       el.gLabel.setAttribute("fill", ink);
       el.gLabel.textContent = "mg";
 
-      // Fingertip on the near face at the contact height. The press acts down through the pivot edge.
+      // Fingertip on the top face just inboard of the near edge, so the press acts down through the pivot.
       const br = 7;
-      const ball = P(-br / s, h);
+      // A slipping fingertip slides left until it sits over the near edge.
+      const ball = P(((br + 2) * (outcome === "slips" ? 1 - phase : 1)) / s, H + br / s);
       el.ball.setAttribute("cx", String(ball[0]));
       el.ball.setAttribute("cy", String(ball[1]));
       el.ball.setAttribute("fill", primary);
-      const pressLen = press > 0 ? Math.min(12 + 2.5 * press, 70) : 0;
+      const pressLen = press > 0 ? Math.min(12 + 2.5 * press, 60) : 0;
       el.press.setAttribute("d", press > 0 ? arrow(ball[0], ball[1] - br - 4 - pressLen, ball[0], ball[1] - br - 4) : "");
       el.press.setAttribute("stroke", c2);
       el.pressLabel.setAttribute("x", String(ball[0] - 6));
@@ -372,9 +389,13 @@ const groups = [
       el.pullLabel.textContent = "pull";
 
       el.result.setAttribute("fill", tips ? css("--good") : css("--bad"));
-      el.result.textContent = tips ? "Tips about the near edge" : "Base slides";
+      el.result.textContent = { tips: "Tips about the near edge", slides: "Base slides", slips: "Fingertip slips" }[outcome];
       el.tilt.setAttribute("fill", ink);
-      el.tilt.textContent = tips ? `tilt ${deg(theta).toFixed(1)}° · θ* ${deg(thetaStar).toFixed(1)}°` : `slid ${(shift * 100).toFixed(1)} cm`;
+      el.tilt.textContent = {
+        tips: `tilt ${deg(theta).toFixed(1)}° · θ* ${deg(thetaStar).toFixed(1)}°`,
+        slides: `slid ${(shift * 100).toFixed(1)} cm`,
+        slips: "object stays put",
+      }[outcome];
     }
 
     // Smooth ramp up, hold, return, rest.
