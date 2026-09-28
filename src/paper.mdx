@@ -140,24 +140,41 @@ These plots show processed measurements from trial 2 for each object. Wrenches a
 
 In MuJoCo, a floating fingertip performs a low sliding push, then presses, pulls, and returns the object. A virtual wrist F/T sensor supplies measurements to the same estimator used for the real-robot data. Mass and CoM height are withheld from the estimator; planar CoM is supplied.
 
+The two clips below use the acrylic box with its measured table friction, μ<sub>t</sub> = 0.156. Pushed high on its near face with no press, as in conventional forward tipping, the box slides 6 cm and never tilts. With the press holding the pivot, the same box tips and returns, and the estimator recovers its parameters.
+
 <div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
-  <VideoCard src="videos/sim_press_pull.mp4" poster="posters/sim_press_pull.jpg" title="Push → press → pull → return" speed="×5" aspect="16/9">
-    Simulation of both interaction modes. The object's CoM can be set independently of its geometry.
+  <VideoCard tone="fail" src="videos/sim_forward_push_slides.mp4" poster="posters/sim_forward_push_slides.jpg" title="Forward push, no press · slides" speed="×2" aspect="16/9">
+    Tipping about the far edge needs more push than the base friction can hold, so the box slides.
   </VideoCard>
-  <div class="not-prose min-w-0 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
-    <p class="mt-0 text-sm font-semibold">Example simulation result</p>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead><tr><th class="pb-2">Parameter</th><th class="pb-2">True</th><th class="pb-2">Estimated</th></tr></thead>
-        <tbody>
-          <tr><td class="py-1">Mass</td><td>0.6760 kg</td><td>0.6753 kg</td></tr>
-          <tr><td class="py-1">CoM height</td><td>15.00 cm</td><td>14.98 cm</td></tr>
-          <tr><td class="py-1">Friction</td><td>0.2500</td><td>0.2408</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="mb-0 text-xs text-zinc-500">One simulation example; physical-object accuracy is reported above.</p>
+  <VideoCard tone="success" src="videos/sim_box.mp4" poster="posters/sim_box.jpg" title="Push → press → pull → return · tips" speed="×5" aspect="16/9">
+    Same box, same friction. The low sliding push measures friction, then the press pins the pivot for the pull.
+  </VideoCard>
+</div>
+
+The other three objects are simulated as boxes of roughly their size, with their measured mass, CoM, and table friction. The shapes are approximate: the heart's outline, the flashlight's curved base, and the monitor's flex are not modeled. The heart uses a 3 N press instead of 8 N; at 239 g, a harder press shoves its base along the table as it tilts.
+
+<div class="grid grid-cols-1 items-start gap-6 md:grid-cols-3">
+  <VideoCard src="videos/sim_heart.mp4" poster="posters/sim_heart.jpg" title="Heart Prism (box stand-in)" speed="×5" aspect="16/9" />
+  <VideoCard src="videos/sim_flashlight.mp4" poster="posters/sim_flashlight.jpg" title="Curved Flashlight (box stand-in)" speed="×5" aspect="16/9" />
+  <VideoCard src="videos/sim_monitor.mp4" poster="posters/sim_monitor.jpg" title="Monitor (box stand-in)" speed="×5" aspect="16/9" />
+</div>
+
+<div class="not-prose my-6 min-w-0 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+  <p class="mt-0 text-sm font-semibold">Simulation results, one run per object</p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr><th class="pb-2 pr-3">Object</th><th class="pb-2 pr-3 text-right">m true (kg)</th><th class="pb-2 pr-3 text-right">m est.</th><th class="pb-2 pr-3 text-right">z<sub>c</sub> true (cm)</th><th class="pb-2 pr-3 text-right">z<sub>c</sub> est.</th><th class="pb-2 pr-3 text-right">μ<sub>t</sub> true</th><th class="pb-2 text-right">μ<sub>t</sub> est.</th></tr>
+      </thead>
+      <tbody class="font-mono tabular-nums">
+          <tr class="border-t border-zinc-100 dark:border-zinc-800"><td class="py-1.5 pr-3 font-sans">Hollow Acrylic Box</td><td class="pr-3 text-right">0.676</td><td class="pr-3 text-right">0.675</td><td class="pr-3 text-right">15.00</td><td class="pr-3 text-right">14.98</td><td class="pr-3 text-right">0.156</td><td class="text-right">0.153</td></tr>
+          <tr class="border-t border-zinc-100 dark:border-zinc-800"><td class="py-1.5 pr-3 font-sans">Heart Prism</td><td class="pr-3 text-right">0.239</td><td class="pr-3 text-right">0.238</td><td class="pr-3 text-right">10.00</td><td class="pr-3 text-right">9.99</td><td class="pr-3 text-right">0.256</td><td class="text-right">0.254</td></tr>
+          <tr class="border-t border-zinc-100 dark:border-zinc-800"><td class="py-1.5 pr-3 font-sans">Curved Flashlight</td><td class="pr-3 text-right">0.387</td><td class="pr-3 text-right">0.385</td><td class="pr-3 text-right">9.38</td><td class="pr-3 text-right">9.38</td><td class="pr-3 text-right">0.240</td><td class="text-right">0.241</td></tr>
+          <tr class="border-t border-zinc-100 dark:border-zinc-800"><td class="py-1.5 pr-3 font-sans">Monitor</td><td class="pr-3 text-right">5.040</td><td class="pr-3 text-right">5.040</td><td class="pr-3 text-right">23.20</td><td class="pr-3 text-right">23.19</td><td class="pr-3 text-right">0.643</td><td class="text-right">0.627</td></tr>
+      </tbody>
+    </table>
   </div>
+  <p class="mb-0 text-xs text-zinc-500">Simulation has no sensor noise, fingertip compliance, or shape effects, so these errors are far below the real-robot results above.</p>
 </div>
 
 <h2 id="code">Code and data</h2>

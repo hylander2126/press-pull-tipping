@@ -83,6 +83,28 @@ const groups = [
     <div class="flex min-w-0 flex-col gap-4">
       <div data-status class="rounded-lg border-l-4 p-3 text-sm" role="status" aria-live="polite"></div>
       <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
+        <div class="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-1">
+          <span class="text-sm font-semibold">Side view during the pull</span>
+          <span class="text-xs text-zinc-500 dark:text-zinc-400">Schematic box, 2x<sub>c</sub> wide</span>
+        </div>
+        <svg data-scene viewBox="0 0 480 230" class="block h-[230px] w-full" role="img" aria-label="Side view of the object tipping about its near bottom edge, or sliding, as the fingertip pulls">
+          <line data-el="table" x1="0" x2="480" y1="205" y2="205" stroke-width="2" />
+          <line data-el="plumb" stroke-width="1.5" stroke-dasharray="4 4" />
+          <polygon data-el="body" stroke-width="2" stroke-linejoin="round" />
+          <path data-el="g" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          <circle data-el="com" r="5" />
+          <path data-el="press" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          <path data-el="pull" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+          <circle data-el="ball" r="7" />
+          <circle data-el="pivot" r="3.5" />
+          <text data-el="gLabel" font-size="12" />
+          <text data-el="pressLabel" font-size="12" text-anchor="end" />
+          <text data-el="pullLabel" font-size="12" text-anchor="end" />
+          <text data-el="result" x="12" y="24" font-size="14" font-weight="600" />
+          <text data-el="tilt" x="12" y="42" font-size="12" />
+        </svg>
+      </div>
+      <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
         <div class="px-2 pt-1 text-sm font-semibold">Tipping torque about the pivot during the pull</div>
         <div data-chart class="h-[320px] w-full" role="img" aria-label="Simulated torque versus tilt samples with the true model curve and the least-squares fit"></div>
       </div>
@@ -258,7 +280,137 @@ const groups = [
         .join("");
 
       draw(th, tau, thetaStar, valid ? { a, b, thetaHat: Math.atan2(a, b) } : null, m, xc, zc);
+      scene = { m, xc, zc, h, press, tips, thetaStar, W: 2 * xc, H: Math.max(2 * zc, h + 0.01) };
+      drawScene();
     }
+
+    // Side view. The object tips about its near (left) bottom edge toward the fingertip, or,
+    // when friction can't hold the base, slides left without tilting. One cycle ramps the
+    // pull up, holds, and returns, like the arc and unarc.
+    type Scene = { m: number; xc: number; zc: number; h: number; press: number; tips: boolean; thetaStar: number; W: number; H: number };
+    let scene: Scene | null = null;
+    const svg = root.querySelector<SVGSVGElement>("[data-scene]")!;
+    const el = Object.fromEntries(Array.from(svg.querySelectorAll<SVGElement>("[data-el]")).map((e) => [e.dataset.el!, e]));
+    const GROUND = 205, SLIDE = 0.05, CYCLE = 4.5;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let phase = 0.4; // 0..1 of how far into the pull; the still frame when motion is off
+    const t0 = performance.now();
+    let visible = false;
+    let running = false;
+
+    function arrow(x1: number, y1: number, x2: number, y2: number) {
+      const a = Math.atan2(y2 - y1, x2 - x1), k = 7;
+      const h1 = `${x2 - k * Math.cos(a - 0.45)},${y2 - k * Math.sin(a - 0.45)}`;
+      const h2 = `${x2 - k * Math.cos(a + 0.45)},${y2 - k * Math.sin(a + 0.45)}`;
+      return `M${x1},${y1} L${x2},${y2} M${h1} L${x2},${y2} L${h2}`;
+    }
+
+    function drawScene() {
+      if (!scene) return;
+      const { m, xc, zc, h, press, tips, thetaStar, W, H } = scene;
+      const thetaMax = 0.85 * thetaStar;
+      const theta = tips ? thetaMax * phase : 0;
+      const shift = tips ? 0 : SLIDE * phase;
+
+      // Fit the swept extent into the view: left of the pivot for the tilt or slide, right for the width.
+      const left = Math.max(H * Math.sin(thetaMax), SLIDE) + 0.04;
+      const s = Math.min(165 / (H + 0.02), 440 / (left + W));
+      const px = 20 + left * s + (440 - (left + W) * s) / 2;
+      const c = Math.cos(theta), sn = Math.sin(theta);
+      // Object frame (x right from the pivot, z up) to screen, tilted toward -x by theta.
+      const P = (x: number, z: number): [number, number] => [px + ((x * c - z * sn) - shift) * s, GROUND - (x * sn + z * c) * s];
+      const pt = (p: [number, number]) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+
+      const ink = css("--text-secondary"), primary = css("--text-primary"), c1 = css("--series-1"), c2 = css("--series-2");
+      el.table.setAttribute("stroke", ink);
+      el.body.setAttribute("points", [P(0, 0), P(W, 0), P(W, H), P(0, H)].map(pt).join(" "));
+      el.body.setAttribute("fill", c1);
+      el.body.setAttribute("fill-opacity", "0.18");
+      el.body.setAttribute("stroke", c1);
+
+      const pivot = P(0, 0), com = P(xc, zc);
+      el.pivot.setAttribute("cx", String(pivot[0]));
+      el.pivot.setAttribute("cy", String(pivot[1]));
+      el.pivot.setAttribute("fill", primary);
+      el.com.setAttribute("cx", String(com[0]));
+      el.com.setAttribute("cy", String(com[1]));
+      el.com.setAttribute("fill", primary);
+      // The CoM crosses this line at theta*, where gravity stops resisting the tip.
+      el.plumb.setAttribute("x1", String(pivot[0]));
+      el.plumb.setAttribute("x2", String(pivot[0]));
+      el.plumb.setAttribute("y1", String(GROUND));
+      el.plumb.setAttribute("y2", String(GROUND - (H + 0.01) * s));
+      el.plumb.setAttribute("stroke", ink);
+      el.plumb.setAttribute("stroke-opacity", tips ? "1" : "0");
+
+      const gLen = Math.min(18 + 6 * m, 60);
+      el.g.setAttribute("d", arrow(com[0], com[1], com[0], com[1] + gLen));
+      el.g.setAttribute("stroke", ink);
+      el.gLabel.setAttribute("x", String(com[0] + 7));
+      el.gLabel.setAttribute("y", String(com[1] + gLen));
+      el.gLabel.setAttribute("fill", ink);
+      el.gLabel.textContent = "mg";
+
+      // Fingertip on the near face at the contact height. The press acts down through the pivot edge.
+      const br = 7;
+      const ball = P(-br / s, h);
+      el.ball.setAttribute("cx", String(ball[0]));
+      el.ball.setAttribute("cy", String(ball[1]));
+      el.ball.setAttribute("fill", primary);
+      const pressLen = press > 0 ? Math.min(12 + 2.5 * press, 70) : 0;
+      el.press.setAttribute("d", press > 0 ? arrow(ball[0], ball[1] - br - 4 - pressLen, ball[0], ball[1] - br - 4) : "");
+      el.press.setAttribute("stroke", c2);
+      el.pressLabel.setAttribute("x", String(ball[0] - 6));
+      el.pressLabel.setAttribute("y", String(ball[1] - br - 8 - pressLen / 2));
+      el.pressLabel.setAttribute("fill", c2);
+      el.pressLabel.textContent = press > 0 ? "press" : "";
+      el.pull.setAttribute("d", arrow(ball[0] - br - 2, ball[1], ball[0] - br - 38, ball[1]));
+      el.pull.setAttribute("stroke", c2);
+      el.pullLabel.setAttribute("x", String(ball[0] - br - 42));
+      el.pullLabel.setAttribute("y", String(ball[1] + 4));
+      el.pullLabel.setAttribute("fill", c2);
+      el.pullLabel.textContent = "pull";
+
+      el.result.setAttribute("fill", tips ? css("--good") : css("--bad"));
+      el.result.textContent = tips ? "Tips about the near edge" : "Base slides";
+      el.tilt.setAttribute("fill", ink);
+      el.tilt.textContent = tips ? `tilt ${deg(theta).toFixed(1)}° · θ* ${deg(thetaStar).toFixed(1)}°` : `slid ${(shift * 100).toFixed(1)} cm`;
+    }
+
+    // Smooth ramp up, hold, return, rest.
+    function cyclePhase(t: number) {
+      const u = (t % CYCLE) / CYCLE;
+      const ease = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(Math.max(x, 0), 1));
+      if (u < 0.35) return ease(u / 0.35);
+      if (u < 0.5) return 1;
+      if (u < 0.85) return 1 - ease((u - 0.5) / 0.35);
+      return 0;
+    }
+
+    function tick(now: number) {
+      if (!visible || reducedMotion.matches) {
+        running = false;
+        return;
+      }
+      phase = cyclePhase((now - t0) / 1000);
+      drawScene();
+      requestAnimationFrame(tick);
+    }
+    function play() {
+      if (reducedMotion.matches) {
+        phase = 0.85; // a still frame near the end of the pull
+        drawScene();
+      } else if (visible && !running) {
+        running = true;
+        requestAnimationFrame(tick);
+      }
+    }
+    new IntersectionObserver(([entry]) => {
+      const was = visible;
+      visible = entry.isIntersecting;
+      if (visible && !was) play();
+    }).observe(svg);
+    reducedMotion.addEventListener("change", play);
 
     function draw(th: number[], tau: number[], thetaStar: number, fit: { a: number; b: number; thetaHat: number } | null, m: number, xc: number, zc: number) {
       if (!Plotly) return;

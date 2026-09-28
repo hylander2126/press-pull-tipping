@@ -21,6 +21,7 @@ through the same estimator used on the robot data.
     python -m press_pull_estimator.sim.press_pull_sandbox --object slab --mass 0.8 --com-z 0.09
     python -m press_pull_estimator.sim.press_pull_sandbox --viewer           # watch it live
     python -m press_pull_estimator.sim.press_pull_sandbox --record sim.mp4   # offscreen render (needs imageio)
+    python -m press_pull_estimator.sim.press_pull_sandbox --object box --mu-table 0.156 --forward-push   # no press
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ import argparse
 import mujoco
 import numpy as np
 
+from press_pull_estimator.objects import OBJECTS
 from press_pull_estimator.estimator.wrench_estimator import (
     BALL_TO_WRENCH_ORIGIN_X,
     STATE_ARC, STATE_LULL, STATE_RETRACT, STATE_SQUASH, STATE_UNARC,
@@ -41,14 +43,24 @@ from press_pull_estimator.estimator.wrench_estimator import (
 BALL_R = 0.012
 PIVOT_X = 0.61          # near bottom edge of the object, in world x (matches the robot setup)
 
+# Object geometry as (half-extents, rgba). All are prisms, so the pivot is a full edge. MuJoCo
+# cylinders pivot on a single rim point and tend to roll sideways, which a real press resists.
+# heart, flashlight, and monitor are box stand-ins for the benchmark objects: roughly their
+# size, with the true mass and CoM from objects.py. They don't model the heart's outline, the
+# flashlight's curved base, or the monitor's flex.
+SHAPES = {
+    "box":        ((0.05, 0.06, 0.15),    ".55 .75 .95 .55"),
+    "slab":       ((0.075, 0.04, 0.10),   ".95 .7 .3 .6"),
+    "heart":      ((0.046, 0.025, 0.11),  ".9 .35 .45 .6"),
+    "flashlight": ((0.03, 0.03, 0.10),    ".45 .45 .5 .6"),
+    "monitor":    ((0.06, 0.2, 0.265),    ".3 .3 .35 .6"),
+}
+
 
 def build_xml(obj: str, mass: float, com_x: float, com_z: float, mu_table: float) -> tuple[str, float, float]:
     """The object sits with its near bottom edge on x = PIVOT_X. Its CoM is placed by
     `inertial` and is independent of the geometry, so the estimator cannot read it off the mesh."""
-    # (half-extents, rgba). Both are prisms, so the pivot is a full edge. MuJoCo cylinders
-    # pivot on a single rim point and tend to roll sideways, which a real press resists.
-    hx, hy, hz = {"box": (0.05, 0.06, 0.15), "slab": (0.075, 0.04, 0.10)}[obj]
-    rgba = {"box": ".55 .75 .95 .55", "slab": ".95 .7 .3 .6"}[obj]
+    (hx, hy, hz), rgba = SHAPES[obj]
     geom = (f'<geom name="obj" type="box" size="{hx} {hy} {hz}" pos="{hx} 0 {hz}" '
             f'friction="{mu_table} .005 .0001" rgba="{rgba}"/>')
     top_z, top_x = 2 * hz, 2 * hx
@@ -63,11 +75,11 @@ def build_xml(obj: str, mass: float, com_x: float, com_z: float, mu_table: float
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="1 1 1" rgb2=".86 .89 .93" width="256" height="256"/>
     <texture name="grid" type="2d" builtin="checker" rgb1=".92 .92 .92" rgb2=".82 .82 .82" width="512" height="512"/>
-    <material name="table" texture="grid" texrepeat="8 8" reflectance=".05"/>
+    <material name="table" texture="grid" texrepeat="20 20" reflectance=".05"/>
   </asset>
   <worldbody>
     <light pos="0.3 -0.6 1.2" dir="0.2 0.5 -1" diffuse=".9 .9 .9"/>
-    <geom name="table" type="plane" size="1.2 1.2 .01" material="table" friction="{mu_table} .005 .0001"/>
+    <geom name="table" type="plane" size="3 3 .01" material="table" friction="{mu_table} .005 .0001"/>
     <body name="object" pos="{PIVOT_X} 0 0">
       <freejoint/>
       <inertial pos="{com_x} 0 {com_z}" mass="{mass}" diaginertia="{i} {i} {i}"/>
@@ -280,16 +292,17 @@ def make_viewer():
     return render
 
 
-def make_recorder(frames: list, width=1280, height=720):
-    """Render callback that appends offscreen side-view frames to `frames`."""
+def make_recorder(frames: list, obj="box", width=1280, height=720):
+    """Render callback that appends offscreen side-view frames to `frames`, framed to fit `obj`."""
+    (hx, _, hz), _ = SHAPES[obj]
     state = {}
 
     def render(m, d):
         if "r" not in state:
             state["r"] = mujoco.Renderer(m, height, width)
             cam = mujoco.MjvCamera()
-            cam.lookat[:] = [PIVOT_X + 0.02, 0, 0.16]
-            cam.distance, cam.azimuth, cam.elevation = 0.85, 90, -10
+            cam.lookat[:] = [PIVOT_X + 0.02, 0, hz + 0.01]
+            cam.distance, cam.azimuth, cam.elevation = max(0.85, 5.3 * hz + 0.05), 90, -10
             state["cam"] = cam
         state["r"].update_scene(d, state["cam"])
         frames.append(state["r"].render())
@@ -298,30 +311,58 @@ def make_recorder(frames: list, width=1280, height=720):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--object", choices=["box", "slab"], default="box")
+    ap.add_argument("--object", choices=list(SHAPES), default="box")
     ap.add_argument("--mass", type=float, default=None, help="true mass, hidden from the estimator (kg)")
     ap.add_argument("--com-z", type=float, default=None, help="true CoM height, hidden from the estimator (m)")
     ap.add_argument("--mu-table", type=float, default=None, help="true support friction (default 0.25)")
     ap.add_argument("--press", type=float, default=8.0, help="Mode 2 normal press force (N)")
     ap.add_argument("--world-fixed-finger", action="store_true",
                     help="keep the finger orientation world-fixed during the arc (the paper's strategy)")
+    ap.add_argument("--forward-push", action="store_true",
+                    help="instead of the estimation run, push the near face high up with no press "
+                         "(conventional forward tipping) and report whether the object tips or slides")
     ap.add_argument("--viewer", action="store_true", help="open the interactive MuJoCo viewer")
     ap.add_argument("--record", default=None, help="write an MP4 of the run (requires imageio[ffmpeg])")
     args = ap.parse_args()
 
     # (mass, com_x, com_z, mu_table). The slab's CoM sits off-centre and high, as in a loaded
     # container, so theta* differs from what its geometry would suggest.
-    defaults = {"box": (0.676, 0.05, 0.15, 0.25), "slab": (1.2, 0.06, 0.13, 0.25)}
+    defaults = {k: (o["mass"], o["com_x"], o["com_z"], 0.25) for k, o in OBJECTS.items()}
+    defaults["slab"] = (1.2, 0.06, 0.13, 0.25)
     mass, com_x, com_z, mu_table = defaults[args.object]
     mass, com_z = args.mass or mass, args.com_z or com_z
     args.mu_table = args.mu_table or mu_table
 
     frames = []
-    render = make_viewer() if args.viewer else make_recorder(frames) if args.record else None
+    render = make_viewer() if args.viewer else make_recorder(frames, args.object) if args.record else None
     sb = Sandbox(args.object, mass, com_x, com_z, args.mu_table, render)
     sb.step(0, 500)                                  # settle
 
     print(f"[sim] {args.object}: true m={mass:.3f} kg, z_c={com_z * 100:.2f} cm, mu_t={args.mu_table:.3f}")
+    if args.forward_push:
+        forward_push(sb)
+    else:
+        estimate(sb, args, mass, com_x, com_z)
+
+    if args.record and frames:
+        import imageio.v2 as imageio
+        imageio.mimsave(args.record, frames, fps=30, quality=8, macro_block_size=8)
+        print(f"[sim] wrote {args.record} ({len(frames)} frames)")
+
+
+def forward_push(sb: Sandbox):
+    """Conventional forward tipping: push the near face at 3/4 height with no press. Tipping about
+    the far edge needs m g (2 h_x - x_c) / h of push, and the base slides once the push reaches
+    mu_t m g, so a low-friction table slides the object instead of tipping it."""
+    body = mujoco.mj_name2id(sb.m, mujoco.mjtObj.mjOBJ_BODY, "object")
+    x0 = sb.d.xpos[body][0]
+    tilt = lambda: np.degrees(np.arccos(np.clip(sb.d.xmat[body][8], -1, 1)))  # noqa: E731
+    sb.push(height=0.75 * sb.top_z, dist=0.06)
+    sb.step(0, 1000)
+    print(f"[forward push] base slid {(sb.d.xpos[body][0] - x0) * 1000:.1f} mm, final tilt {tilt():.1f} deg")
+
+
+def estimate(sb: Sandbox, args, mass: float, com_x: float, com_z: float):
     fx, fy = sb.push()
     mu_m = coulomb_product_from_push(fx, fy)
     print(f"[Mode 1] Coulomb product  mu_t*m = {mu_m:.4f} kg  (cached)")
@@ -342,11 +383,6 @@ def main():
     print(f"         z_c = {r.com_z * 100:.2f} cm   (true {com_z * 100:.2f}, err {err(r.com_z, com_z):.1f}%)")
     print(f"         mu_t= {mu:.4f}      (true {args.mu_table:.4f}, err {err(mu, args.mu_table):.1f}%)")
     print(f"         theta* = {r.theta_star_deg:.2f} deg, no-slip dev {r.noslip_dev_mm:.2f} mm")
-
-    if args.record and frames:
-        import imageio.v2 as imageio
-        imageio.mimsave(args.record, frames, fps=30, quality=8, macro_block_size=8)
-        print(f"[sim] wrote {args.record} ({len(frames)} frames)")
 
 
 if __name__ == "__main__":

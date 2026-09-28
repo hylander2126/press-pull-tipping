@@ -84,6 +84,8 @@ The public functions take plain numpy arrays, so you can feed them your own robo
 python -m press_pull_estimator.sim.press_pull_sandbox                    # box: m=0.676 kg, z_c=15 cm
 python -m press_pull_estimator.sim.press_pull_sandbox --mass 1.1 --com-z 0.11
 python -m press_pull_estimator.sim.press_pull_sandbox --object slab
+python -m press_pull_estimator.sim.press_pull_sandbox --object heart --mu-table 0.256 --press 3   # also flashlight, monitor
+python -m press_pull_estimator.sim.press_pull_sandbox --object box --mu-table 0.156 --forward-push  # no press: slides
 python -m press_pull_estimator.sim.press_pull_sandbox --viewer            # interactive viewer, real time
 python -m press_pull_estimator.sim.press_pull_sandbox --record run.mp4    # offscreen (MUJOCO_GL=egl on headless machines)
 ```
@@ -107,6 +109,11 @@ Notes and differences from the physical setup:
   (for example `--object slab --mu-table 0.15`) the base slides out. The sandbox detects this and
   prints a warning instead of reporting a meaningless estimate. On the robot, the adaptive press
   (Sec. 2.3) handles this case.
+- **Benchmark stand-ins.** `heart`, `flashlight`, and `monitor` are boxes of roughly each object's
+  size with its true mass and CoM. They don't model the heart's outline, the flashlight's curved
+  base, or the monitor's flex. The light heart needs `--press 3`; at 8 N its base slides.
+- **Forward push.** `--forward-push` skips estimation and pushes the near face at 3/4 height with no
+  press, like conventional forward tipping. On the box's measured μ_t = 0.156 it slides instead of tipping.
 - Mode 1 uses a nearly frictionless fingertip contact so that the finger does not drag the object
   into the table.
 
