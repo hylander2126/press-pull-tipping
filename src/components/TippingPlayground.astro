@@ -4,23 +4,11 @@
 // top face just inboard of the pivot edge, so the press acts through that edge. The torque fit is the one in wrench_estimator.estimate_press_pull. With the
 // planar CoM offset x_c known, tau(theta) = m g (x_c cos theta - z_c sin theta) is linear in
 // (m g x_c, m g z_c), so ordinary least squares recovers (m, z_c) exactly without noise.
-import results from "../data/results.json";
-
-// Presets use each object's measured ground truth. x_c follows from the true tipping angle.
-const THETA_STAR_GT: Record<string, number> = { box: 18.435, heart: 24.608, flashlight: 16.621, monitor: 14.5 };
-const presets = Object.entries(results).map(([key, r]) => ({
-  key,
-  label: r.label,
-  m: r.gt.m,
-  zc: r.gt.zc * 100,
-  xc: r.gt.zc * Math.tan((THETA_STAR_GT[key] * Math.PI) / 180) * 100,
-  mu: r.gt.mu,
-}));
 
 const sliders = [
   { id: "m", label: "Mass", unit: "kg", min: 0.1, max: 6, step: 0.01, value: 0.68, group: "object" },
-  { id: "xc", label: "CoM offset from pivot edge, x<sub>c</sub>", unit: "cm", min: 1, max: 15, step: 0.1, value: 5, group: "object" },
-  { id: "zc", label: "CoM height, z<sub>c</sub>", unit: "cm", min: 2, max: 30, step: 0.1, value: 15, group: "object" },
+  { id: "xc", label: "CoM offset from pivot edge, x<sub>c</sub>", unit: "cm", min: 0.5, max: 9.5, step: 0.1, value: 5, group: "object" },
+  { id: "zc", label: "CoM height, z<sub>c</sub>", unit: "cm", min: 2, max: 28, step: 0.1, value: 15, group: "object" },
   { id: "mu", label: "Table friction, μ<sub>t</sub>", unit: "", min: 0.05, max: 0.8, step: 0.01, value: 0.16, group: "object" },
   { id: "muf", label: "Fingertip friction, μ<sub>f</sub>", unit: "", min: 0.1, max: 1.5, step: 0.01, value: 0.8, group: "action" },
   { id: "press", label: "Press force", unit: "N", min: 0, max: 30, step: 0.5, value: 5, group: "action" },
@@ -36,21 +24,6 @@ const groups = [
   <div class="mb-3 flex flex-wrap items-baseline justify-between gap-2">
     <p class="m-0 text-base font-semibold">Interactive model</p>
     <p class="m-0 text-xs text-zinc-500 dark:text-zinc-400">Simplified planar model</p>
-  </div>
-
-  <div class="mb-4 flex flex-wrap items-center gap-2" role="group" aria-label="Load an object's true parameters">
-    <span class="text-xs text-zinc-500 dark:text-zinc-400">Load an object:</span>
-    {
-      presets.map((p) => (
-        <button
-          type="button"
-          data-preset={JSON.stringify(p)}
-          class="rounded-full border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-600 dark:hover:bg-zinc-800"
-        >
-          {p.label}
-        </button>
-      ))
-    }
   </div>
 
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-[18rem_1fr]">
@@ -85,7 +58,7 @@ const groups = [
       <div class="rounded-xl border border-zinc-200 p-2 dark:border-zinc-700">
         <div class="flex flex-wrap items-baseline justify-between gap-2 px-2 pt-1">
           <span class="text-sm font-semibold">Side view during the pull</span>
-          <span class="text-xs text-zinc-500 dark:text-zinc-400">Schematic box, 2x<sub>c</sub> wide × 2z<sub>c</sub> tall</span>
+          <span class="text-xs text-zinc-500 dark:text-zinc-400">Schematic 10 × 30 cm box; the sliders move the CoM</span>
         </div>
         <svg data-scene viewBox="0 0 480 280" class="block h-[280px] w-full" role="img" aria-label="Side view of the object tipping about its near bottom edge, or sliding, as the fingertip pulls">
           <line data-el="table" x1="0" x2="480" y1="255" y2="255" stroke-width="2" />
@@ -128,7 +101,7 @@ const groups = [
     <summary class="cursor-pointer">What this model includes</summary>
     <p class="mt-2">
       The fingertip presses on the top face, just inboard of the pivot edge, and pulls horizontally. The schematic box is
-      <i>H</i> = 2<i>z<sub>c</sub></i> tall, so the object tips once the pull reaches <i>m g x<sub>c</sub></i> / <i>H</i>. The table resists sliding up to <i>μ<sub>t</sub></i>(<i>m g</i> + <i>F</i><sub>press</sub>),
+      10 cm wide and <i>H</i> = 30 cm tall, roughly the acrylic box, and the CoM sliders move only the CoM inside it. The object tips once the pull reaches <i>m g x<sub>c</sub></i> / <i>H</i>. The table resists sliding up to <i>μ<sub>t</sub></i>(<i>m g</i> + <i>F</i><sub>press</sub>),
       and the press passes through the pivot edge, so it raises that limit without resisting the tip. The pull reaches the object only
       through fingertip friction, so the fingertip slips once the pull exceeds <i>μ<sub>f</sub> F</i><sub>press</sub>. Tilt samples run from 1° to 80% of the
       tipping angle θ*, roughly the range of the real trials, and the fit extrapolates the zero crossing. The sliding push measures
@@ -189,6 +162,7 @@ const groups = [
 
 <script>
   const G = 9.81;
+  const BOX_W = 0.1, BOX_H = 0.3; // m, the schematic box (roughly the acrylic box); every slider CoM lies inside it
   const N_SAMPLES = 60;
   // Noise at the "1×" setting, chosen to be in the range of the binned real-robot signals.
   const SIGMA_TAU = 0.004; // N·m
@@ -228,7 +202,7 @@ const groups = [
 
       const m = val("m"), xc = val("xc") / 100, zc = val("zc") / 100, mu = val("mu");
       const muf = val("muf"), press = val("press"), noise = val("noise");
-      const H = 2 * zc; // the fingertip contact is on the top face
+      const H = BOX_H, W = BOX_W; // fixed schematic box; the fingertip contact is on the top face
       const thetaStar = Math.atan2(xc, zc);
 
       // Which happens first as the pull ramps up: tipping, the base sliding, or the fingertip slipping?
@@ -291,7 +265,7 @@ const groups = [
         .join("");
 
       draw(th, tau, thetaStar, valid ? { a, b, thetaHat: Math.atan2(a, b) } : null, m, xc, zc);
-      scene = { m, xc, zc, press, outcome, thetaStar, W: 2 * xc, H };
+      scene = { m, xc, zc, press, outcome, thetaStar, W, H };
       drawScene();
     }
 
@@ -326,12 +300,9 @@ const groups = [
       const theta = tips ? thetaMax * phase : 0;
       const shift = outcome === "slides" ? SLIDE * phase : 0;
 
-      // Fit the swept extent into the view: left of the pivot for the tilt or slide, right for the width.
-      // Fixed pixel room is kept above the top face for the press arrow and left of it for the pull.
-      const ARROW_ROOM = 90;
-      const left = Math.max(H * Math.sin(thetaMax), SLIDE) + 0.01;
-      const s = Math.min(150 / H, (440 - ARROW_ROOM) / (left + W));
-      const px = 20 + ARROW_ROOM + left * s + (440 - ARROW_ROOM - (left + W) * s) / 2;
+      // Fixed scale and pivot position, so the sliders never move or resize the box. The pivot sits far
+      // enough right that the largest tilt (x_c = 9.5 cm, z_c = 2 cm) and the pull arrow stay in view.
+      const s = 150 / H, px = 260;
       const c = Math.cos(theta), sn = Math.sin(theta);
       // Object frame (x right from the pivot, z up) to screen, tilted toward -x by theta.
       const P = (x: number, z: number): [number, number] => [px + ((x * c - z * sn) - shift) * s, GROUND - (x * sn + z * c) * s];
@@ -474,13 +445,6 @@ const groups = [
       seed = (seed * 2654435761 + 1) >>> 0;
       update();
     });
-    root.querySelectorAll<HTMLButtonElement>("[data-preset]").forEach((btn) =>
-      btn.addEventListener("click", () => {
-        const p = JSON.parse(btn.dataset.preset!);
-        for (const id of ["m", "xc", "zc", "mu"]) inputs[id].value = String(p[id]);
-        update();
-      }),
-    );
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
     update();
 
