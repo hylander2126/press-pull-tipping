@@ -17,9 +17,7 @@ Pipeline for one press-and-pull trial:
            {}^O w_app = -Ad_{T_SO}^T {}^S w_meas
     4. Pivot torque balance tau_app(theta) + tau_grav(theta; m, z_c) = 0 is solved
        for (m, z_c) by non-linear least squares, separately for ARC and UNARC.
-    5. ARC and UNARC estimates are averaged. Fingertip friction and controller lag
-       bias the two sweeps in opposite directions, so the average cancels them
-       (push/retract hysteresis cancellation).
+    5. The ARC and UNARC estimates are averaged.
     6. Friction: Mode 1 (a low sliding push) gives the Coulomb product
        mu_t * m = f_slip / g. It is cached, and once Mode 2 returns m it resolves
        mu_t = f_slip / (m g).

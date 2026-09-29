@@ -4,7 +4,7 @@
     python tools/export_web_data.py
 
 It writes results.json, with per-object ground truth, the estimates (mean +- SD over
-trials), and the ARC-only / UNARC-only / averaged errors behind the hysteresis callout.
+trials), and the ARC-only / UNARC-only / averaged errors behind the sweep table.
 It also writes wrench_<object>.json, the wrench time series and torque-vs-tilt data for
 one representative trial. Every number on the page comes from here, so rerunning it
 after changing the estimator keeps the page consistent.
@@ -89,8 +89,8 @@ def main():
             "est": {"m": stats([x.mass for x in res], gt["mass"]),
                     "zc": stats([x.com_z for x in res], gt["com_z"]),
                     "mu": stats([resolve_friction(mu_m, x.mass) for x in res], mu_gt)},
-            # Hysteresis: each sweep alone vs. the push/retract average.
-            "hysteresis": {
+            # Each sweep alone vs. the ARC/UNARC average.
+            "sweeps": {
                 "m": {"arc": stats([x.arc.mass for x in res], gt["mass"]),
                       "unarc": stats([x.unarc.mass for x in res], gt["mass"]),
                       "avg": stats([x.mass for x in res], gt["mass"])},

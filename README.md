@@ -11,7 +11,7 @@ This repo holds two independent pieces:
 | | What | Where |
 |---|---|---|
 | 🌐 | Project page (Astro + Tailwind + MDX, from [academic-project-astro-template](https://github.com/RomanHauksson/academic-project-astro-template)) | repo root: `src/`, `public/` |
-| 🐍 | `press_pull_estimator`: hardware-free Python estimator, MuJoCo sandbox, and all 40 recorded trials | [`code/`](code/README.md) |
+| 🐍 | `press_pull_estimator`: hardware-free Python estimator and all 40 recorded trials | [`code/`](code/README.md) |
 
 ## Run the estimator
 
@@ -20,7 +20,6 @@ cd code
 pip install -e .
 python run_offline_eval.py --object flashlight   # recovered (m, z_c, mu_t) with error margins
 python run_offline_eval.py --object all -q       # reproduces Table 2 of the paper
-python -m press_pull_estimator.sim.press_pull_sandbox   # MuJoCo press-and-pull demo
 ```
 
 See [`code/README.md`](code/README.md) for details.
@@ -41,7 +40,7 @@ Page layout:
 - `src/site.config.ts`: **paper, arXiv, and repo links and the BibTeX** (fill in the TODOs before publishing)
 - `src/components/`: `DemoShowcase`, `EvidenceStrip`, `VideoCard`, `PipelineDiagram`, `ObjectExplorer` (tabs), `WrenchPlot` (Plotly), `BibTeX`
 - `src/data/*.json`: results and plot data, **generated** by `code/tools/export_web_data.py` from the released trials, so the page's numbers can't drift from the code
-- `public/videos/`: trial clips, shove-task highlight, research overview, forward-tipping comparison, and MuJoCo render
+- `public/videos/`: trial clips, shove-task highlight, research overview, and forward-tipping comparison
 - `public/posters/`: video stills, shown before playback (including with reduced motion)
 - `src/assets/social-preview.svg`: editable social-card source; `public/social-preview.jpg` is the rendered sharing image
 
@@ -54,7 +53,7 @@ The physical trial players offer edited-speed and approximate real-time playback
 sped-up export does not restore omitted frames. Overview playback starts only on request.
 
 The website and Python package deliberately share one repository. The header's Code link
-points to its root; detailed estimator and simulator links point into `code/`. Configure the
+points to its root; detailed estimator links point into `code/`. Configure the
 Git remote to match `REPO_URL` in `src/site.config.ts` before publishing.
 
 ## Deploy

@@ -7,8 +7,9 @@ export const ARXIV_URL = "#"; // TODO: e.g. https://arxiv.org/abs/XXXX.XXXXX
 
 export const CODE_URL = REPO_URL;
 export const PACKAGE_URL = `${REPO_URL}/tree/main/code`;
-export const SANDBOX_URL = `${REPO_URL}/blob/main/code/press_pull_estimator/sim/press_pull_sandbox.py`;
 export const ESTIMATOR_URL = `${REPO_URL}/blob/main/code/press_pull_estimator/estimator/wrench_estimator.py`;
+export const ROBOT_CODE_URL = "https://github.com/hylander2126/irb120_ros2";
+export const SIM_CODE_URL = "https://github.com/hylander2126/mujoco_rl";
 
 export const BIBTEX = `@inproceedings{hyland2026pressandpull,
   title     = {Multi-Modal Non-Prehensile Estimation of Physical Parameters via Press-and-Pull Tipping},

@@ -9,10 +9,9 @@ description = "Press-and-pull non-prehensile estimation of mass, CoM height, and
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "Steven M. Hyland" }, { name = "Jing Xiao" }, { name = "Cagdas D. Onal" }]
-dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7", "mujoco>=3.1"]
+dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7"]
 
 [project.optional-dependencies]
-record = ["imageio[ffmpeg]>=2.31"]
 test = ["pytest>=7"]
 
 [tool.setuptools.packages.find]
